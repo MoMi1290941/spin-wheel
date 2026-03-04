@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spin Wheel Pro - Fixed</title>
+
+<style>
+    body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    /* ลายเส้นตารางขนาดเล็ก */
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+    color: white;
+    text-align: center;
+    padding: 20px;
+}
+    h1 { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+    textarea {
+        width: 80%; max-width: 400px; height: 100px;
+        padding: 10px; border-radius: 8px; border: none; margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+    .controls { margin-bottom: 20px; }
+    button {
+        padding: 12px 25px; background: #007bff; color: white;
+        border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 5px;
+    }
+    button:hover { background: #0056b3; }
+    .wheel-container {
+        position: relative; display: inline-block; margin-top: 20px;
+    }
+    /* ลูกศรชี้ (Pointer) */
+    .pointer {
+        position: absolute; top: -15px; left: 50%;
+        transform: translateX(-50%); width: 0; height: 0;
+        border-left: 15px solid transparent; border-right: 15px solid transparent;
+        border-top: 30px solid #ff4757; z-index: 10;
+    }
+    canvas { border: 5px solid #333; border-radius: 50%; background: #000; 
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 255, 255, 0.1);
+}
+    
+    #result { margin-top: 20px; font-size: 24px; color: #f1c40f; font-weight: bold; height: 30px; }
+
+    /* จัดให้วงล้ออยู่ซ้าย ผลลัพธ์อยู่ขวา */
+.main-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 50px; /* ระยะห่างระหว่างวงล้อกับกล่องผลลัพธ์ */
+    margin-top: 30px;
+    flex-wrap: wrap; /* รองรับหน้าจอเล็กลง */
+}
+
+/* แต่งกล่องพื้นหลังของผลลัพธ์ให้ดูคลีนและ Pro */
+#result-container {
+    background: rgba(255, 255, 255, 0.05); /* พื้นหลังใสๆ แบบกระจก */
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 30px;
+    border-radius: 20px;
+    min-width: 250px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+#result {
+    font-size: 32px;
+    font-weight: bold;
+    color: #38bdf8; /* สีฟ้าสว่างๆ */
+    margin: 0;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+
+
+    
+<h1>🎡 Spin Wheel Pro</h1>
+<p>1 บรรทัด = 1 ตัวเลือก (1 line = 1 option)</p>
+<textarea id="options">1
+2
+3
+4
+5
+6
+7
+8
+9
+sleep
+running
+play game</textarea>
+<div class="controls">
+    <button onclick="generateWheel()">create</button>
+</div>
+
+<div class="wheel-container">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="400" height="400"></canvas>
+</div>
+
+<br>
+<button id="spinBtn" onclick="spin()" style="background: #27ae60; font-size: 20px;">Spin now!</button>
+<div id="result"></div>
+
+<script>
+// --- ส่วนของ JavaScript (แก้ไขเรื่องสี) ---
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+let items = [];
+let currentAngle = 0; // มุมปัจจุบัน (เรเดียน)
+let spinning = false;
+
+// ✅ ฟังก์ชันสร้างสีแบบอัตโนมัติ (ใส่เพิ่มถ้ายังไม่มี)
+function getColor(i, total) {
+    // ใช้ HSL เพื่อให้ได้สีที่หลากหลายและสดใส
+    const hue = (360 / total) * i;
+   return "hsl(" + hue + ", 70%, 50%)"; // ปรับ 80% และ 55% เพื่อความสดและสว่าง
+}
+
+function drawWheel() {
+    if (items.length === 0) return;
+    const arc = (2 * Math.PI) / items.length;
+    
+    // ล้าง Canvas ก่อนวาดใหม่ทุกครั้ง เพื่อไม่ให้สีทับกัน
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    items.forEach((item, i) => {
+        const angle = currentAngle + (i * arc);
+        
+        // --- 🎨 ส่วนที่ทำให้มีสี ---
+        ctx.beginPath();
+        
+        // ✅ เปลี่ยนจาก "black" หรือสีตายตัว เป็นเรียกใช้ฟังก์ชัน getColor
+        ctx.fillStyle = getColor(i, items.length); 
+        
+        ctx.moveTo(200, 200);
+        ctx.arc(200, 200, 200, angle, angle + arc);
+        ctx.fill();
+        ctx.strokeStyle = "#fff"; // ขอบสีขาว (เพิ่มให้ดูสวยขึ้น)
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // -------------------------
+
+        // วาดตัวหนังสือ
+        ctx.save();
+        ctx.translate(200, 200);
+        ctx.rotate(angle + arc / 2);
+        ctx.textAlign = "right";
+        
+        // ✅ ปรับสีตัวหนังสือให้เป็นสีขาว (จะได้เห็นชัดบนพื้นสี)
+        ctx.fillStyle = "white"; 
+        
+        ctx.font = "bold 20px Arial";
+        ctx.fillText(item, 180, 10);
+        ctx.restore();
+    });
+}
+
+function generateWheel() {
+    const text = document.getElementById("options").value;
+    items = text.split("\n").filter(item => item.trim() !== "");
+    if(items.length < 2) return alert("กรุณาใส่ตัวเลือกอย่างน้อย 2 อย่าง");
+    currentAngle = 0;
+    drawWheel(); // วาดวงล้อทันทีหลังจากกดสร้าง
+    document.getElementById("result").innerText = "";
+}
+
+// ... ส่วนโค้ด spin() และ playTick() อื่นๆ เหมือนเดิม ...
+// (แต่อย่าลืมเรียกใช้ getColor ในส่วน spin ตอนวาดใหม่ด้วยนะ)
+
+function generateWheel() {
+    const text = document.getElementById("options").value;
+    items = text.split("\n").filter(item => item.trim() !== "");
+    if(items.length < 2) return alert("กรุณาใส่ตัวเลือกอย่างน้อย 2 อย่าง");
+    currentAngle = 0;
+    drawWheel(); // วาดวงล้อทันทีหลังจากกดสร้าง
+    document.getElementById("result").innerText = "";
+}
+
+// ... ส่วนโค้ด spin() และ playTick() อื่นๆ เหมือนเดิม ...
+// (แต่อย่าลืมเรียกใช้ getColor ในส่วน spin ตอนวาดใหม่ด้วยนะ)
+function generateWheel() {
+    const text = document.getElementById("options").value;
+    items = text.split("\n").filter(item => item.trim() !== "");
+    if(items.length < 2) return alert("กรุณาใส่ตัวเลือกอย่างน้อย 2 อย่าง");
+    currentAngle = 0;
+    drawWheel();
+    document.getElementById("result").innerText = "";
+}
+
+// เล่นเสียง Tick (ปรับปรุงใหม่ไม่ให้ค้าง)
+// เพิ่มตัวแปรเช็คสถานะเสียงไว้ด้านบนสุดของสคริปต์
+let audioCtx = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playTick() {
+    // ถ้ายังไม่ได้รัน AudioContext ให้ข้ามไปก่อนเพื่อไม่ให้โค้ดค้าง
+    if (!audioCtx || audioCtx.state === 'suspended') return;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.05);
+}
+
+function spin() {
+    // ปลดล็อกเสียงเมื่อมีการกดปุ่มหมุนครั้งแรก
+    initAudio(); 
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+
+    if (spinning || items.length < 2) return;
+    spinning = true;
+    
+    // ... โค้ดส่วนการหมุนที่เหลือเหมือนเดิม ...
+}
+
+function spin() {
+    if (spinning || items.length < 2) return;
+    spinning = true;
+    document.getElementById("result").innerText = "Spining...";
+
+    const extraSpins = Math.PI * 2 * (5 + Math.random() * 5); // หมุน 5-10 รอบ
+    const duration = 4000;
+    const start = performance.now();
+    const startAngle = currentAngle;
+
+    function animate(time) {
+        let elapsed = time - start;
+        let progress = Math.min(elapsed / duration, 1);
+        
+        // Ease Out Cubic: หมุนเร็วแล้วค่อยๆ ช้าลง
+        let easeOut = 1 - Math.pow(1 - progress, 3);
+        
+        currentAngle = startAngle + (extraSpins * easeOut);
+        
+        drawWheel();
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            spinning = false;
+            showResult();
+        }
+    }
+    requestAnimationFrame(animate);
+}
+
+function showResult() {
+    const arc = (2 * Math.PI) / items.length;
+    // ปรับจูนการคำนวณให้ตรงกับลูกศรที่อยู่ด้านบน (1.5 * PI คือตำแหน่ง 12 นาฬิกา)
+    const normalizedAngle =
+    (currentAngle % (Math.PI * 2));
+    const index = Math.floor(items.length - ( (normalizedAngle + (Math.PI/2)) % (Math.PI * 2) ) / arc) % items.length;
+    
+    // กันค่า index ติดลบ
+    const finalIndex = index < 0 ? index + items.length : index;
+    document.getElementById("result").innerText = "" + items[finalIndex];
+}
+
+// วาดครั้งแรกตอนโหลดหน้าเว็บ
+generateWheel();
+
+
+</script>
+
+</body>
+</html>
